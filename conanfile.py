@@ -1,6 +1,6 @@
-from conans import ConanFile, CMake, tools
+from conans import ConanFile, CMake, tools, RunEnvironment
 from conans.errors import ConanInvalidConfiguration
-import os, re
+import os, re, platform
 
 class grpcConan(ConanFile):
     name = "grpc_conan"
@@ -110,6 +110,7 @@ conan_basic_setup()
 #    # see https://github.com/conan-io/conan/issues/6012
 #    NO_OUTPUT_DIRS)
 list(APPEND CMAKE_PROGRAM_PATH ${{CONAN_BIN_DIRS}})
+#list(APPEND CMAKE_PROGRAM_PATH bin)
 # TODO: make better: link lib dirs
 link_directories(${{CONAN_LIB_DIRS}})
 #if (APPLE OR UNIX)
@@ -118,7 +119,7 @@ link_directories(${{CONAN_LIB_DIRS}})
 #endif ()
 #
 # see https://github.com/grpc/grpc/issues/21422
-set(CMAKE_CROSSCOMPILING 1)
+# set(CMAKE_CROSSCOMPILING 1)
 set(PROTOBUF_PROTOC_LIBRARIES ${{CONAN_LIBS_PROTOBUF}})
 set(PROTOBUF_INCLUDE_DIRS ${{CONAN_INCLUDE_DIRS_PROTOBUF}})
 #
@@ -193,89 +194,117 @@ message(STATUS "_gRPC_PROTOBUF_PROTOC_EXECUTABLE: ${{_gRPC_PROTOBUF_PROTOC_EXECU
         # grpc_ruby_plugin
 
     def _configure_cmake(self):
-        cmake = CMake(self, set_cmake_flags=True)
-        cmake.verbose = True
+        #self.env_info.PATH.append(os.path.join(self.deps_cpp_info["protobuf"].rootpath, "bin"))
+        #self.env_info.LD_LIBRARY_PATH.append(os.path.join(self.deps_cpp_info["protobuf"].rootpath, "lib"))
 
-        if (self.options.withOpenSSL):
-            cmake.definitions["gRPC_SSL_PROVIDER"]="package"
-            cmake.definitions["OPENSSL_ROOT_DIR"] = self.deps_cpp_info["openssl"].rootpath
+        #env_build = RunEnvironment(self)
 
-        # This doesn't work yet as one would expect, because the install target builds everything
-        # and we need the install target because of the generated CMake files
-        #
-        #   enable_mobile=False # Enables iOS and Android support
-        #   non_cpp_plugins=False # Enables plugins such as --java-out and --py-out (if False, only --cpp-out is possible)
-        #
-        # cmake.definitions['CONAN_ADDITIONAL_PLUGINS'] = "ON" if self.options.build_csharp_ext else "OFF"
-        #
-        # Doesn't work yet for the same reason as above
-        #
-        # cmake.definitions['CONAN_ENABLE_MOBILE'] = "ON" if self.options.build_csharp_ext else "OFF"
+        # NOTE: make sure `protoc` can be found using PATH environment variable
+        bin_path = ""
+        for p in self.deps_cpp_info.bin_paths:
+            bin_path = "%s%s%s" % (p, os.pathsep, bin_path)
 
-        cmake.definitions["gRPC_PROTOBUF_PACKAGE_TYPE"] = "CONFIG"
-        cmake.definitions["gRPC_GFLAGS_PROVIDER"] = "module"
-        cmake.definitions["ZLIB_ROOT"] = self.deps_cpp_info["zlib"].rootpath
+        lib_path = ""
+        for p in self.deps_cpp_info.lib_paths:
+            lib_path = "%s%s%s" % (p, os.pathsep, lib_path)
 
-        cmake.definitions['CMAKE_CROSSCOMPILING'] = "1"
+        # NOTE: make sure `grpc_cpp_plugin` can be found using PATH environment variable
+        path_to_grpc_cpp_plugin = os.path.join(os.getcwd(), "bin")
 
-        cmake.definitions['gRPC_BUILD_CODEGEN'] = "ON" if self.options.build_codegen else "OFF"
-        cmake.definitions['gRPC_BUILD_CSHARP_EXT'] = "ON" if self.options.build_csharp_ext else "OFF"
-        cmake.definitions['gRPC_BUILD_TESTS'] = "OFF"
+        env = {
+             "PATH": "%s%s%s%s%s" % (path_to_grpc_cpp_plugin, os.pathsep, bin_path, os.pathsep, os.environ['PATH']),
+             "LD_LIBRARY_PATH": "%s%s%s" % (lib_path, os.pathsep, os.environ['LD_LIBRARY_PATH'])
+        }
+        self.output.info("=================linux environment for %s=================\n" % (self.name))
+        self.output.info('PATH = %s' % (env['PATH']))
+        self.output.info('LD_LIBRARY_PATH = %s' % (env['LD_LIBRARY_PATH']))
+        self.output.info('')
+        with tools.environment_append(env):
+            cmake = CMake(self, set_cmake_flags=True)
+            cmake.verbose = True
 
-        # We need the generated cmake/ files (bc they depend on the list of targets, which is dynamic)
-        cmake.definitions['gRPC_INSTALL'] = "ON"
-        #cmake.definitions['CMAKE_INSTALL_PREFIX'] = self._build_dir
-        #cmake.definitions['CMAKE_INSTALL_PREFIX'] = self.package_folder
+            if (self.options.withOpenSSL):
+                cmake.definitions["gRPC_SSL_PROVIDER"]="package"
+                cmake.definitions["OPENSSL_ROOT_DIR"] = self.deps_cpp_info["openssl"].rootpath
 
-        # tell grpc to use the find_package versions
-        cmake.definitions['gRPC_CARES_PROVIDER'] = "package"
-        cmake.definitions['gRPC_ZLIB_PROVIDER'] = "package"
-        cmake.definitions['gRPC_SSL_PROVIDER'] = "package"
-        cmake.definitions['gRPC_PROTOBUF_PROVIDER'] = "package"
-        #cmake.definitions['gRPC_PROTOBUF_PROVIDER'] = "module"
+            # This doesn't work yet as one would expect, because the install target builds everything
+            # and we need the install target because of the generated CMake files
+            #
+            #   enable_mobile=False # Enables iOS and Android support
+            #   non_cpp_plugins=False # Enables plugins such as --java-out and --py-out (if False, only --cpp-out is possible)
+            #
+            # cmake.definitions['CONAN_ADDITIONAL_PLUGINS'] = "ON" if self.options.build_csharp_ext else "OFF"
+            #
+            # Doesn't work yet for the same reason as above
+            #
+            # cmake.definitions['CONAN_ENABLE_MOBILE'] = "ON" if self.options.build_csharp_ext else "OFF"
 
-        # Compilation on minGW GCC requires to set _WIN32_WINNTT to at least 0x600
-        # https://github.com/grpc/grpc/blob/109c570727c3089fef655edcdd0dd02cc5958010/include/grpc/impl/codegen/port_platform.h#L44
-        if self.settings.os == "Windows" and self.settings.compiler == "gcc":
-            cmake.definitions["CMAKE_CXX_FLAGS"] = "-D_WIN32_WINNT=0x600"
-            cmake.definitions["CMAKE_C_FLAGS"] = "-D_WIN32_WINNT=0x600"
+            cmake.definitions["gRPC_PROTOBUF_PACKAGE_TYPE"] = "CONFIG"
+            cmake.definitions["gRPC_GFLAGS_PROVIDER"] = "package"
+            #cmake.definitions["gRPC_GFLAGS_PROVIDER"] = "module"
+            cmake.definitions["ZLIB_ROOT"] = self.deps_cpp_info["zlib"].rootpath
 
-        #self.build_cmake_prefix_path(cmake,
-        #    self.deps_cpp_info["c-ares"].rootpath,
-        #    self.deps_cpp_info["protobuf"].rootpath
-        #    self._build_dir,
-        #    self._source_dir
-        #)
+            # If CMAKE_CROSSCOMPILING -> find_program for `protoc` and `grpc_cpp_plugin`
+            #cmake.definitions['CMAKE_CROSSCOMPILING'] = "1"
 
-        #cmake.definitions["CMAKE_PROGRAM_PATH"] += ";" + "/home/avakimov_am/.conan/data/protobuf/v3.9.1/conan/stable/package/1a651c5b4129ad794b88522bece2281a7453aee4/bin"
+            cmake.definitions['gRPC_BUILD_CODEGEN'] = "ON" if self.options.build_codegen else "OFF"
+            cmake.definitions['gRPC_BUILD_CSHARP_EXT'] = "ON" if self.options.build_csharp_ext else "OFF"
+            cmake.definitions['gRPC_BUILD_TESTS'] = "OFF"
 
-        self.output.warn("c-ares rootpath = {}".format(self.deps_cpp_info["c-ares"].rootpath))
-        cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.deps_cpp_info["c-ares"].rootpath
-        cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.deps_cpp_info["c-ares"].rootpath
+            # We need the generated cmake/ files (bc they depend on the list of targets, which is dynamic)
+            cmake.definitions['gRPC_INSTALL'] = "ON"
+            #cmake.definitions['CMAKE_INSTALL_PREFIX'] = self._build_dir
+            #cmake.definitions['CMAKE_INSTALL_PREFIX'] = self.package_folder
 
-        self.output.warn("protobuf rootpath = {}".format(self.deps_cpp_info["protobuf"].rootpath))
-        cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.deps_cpp_info["protobuf"].rootpath
-        cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.deps_cpp_info["protobuf"].rootpath
+            # tell grpc to use the find_package versions
+            cmake.definitions['gRPC_CARES_PROVIDER'] = "package"
+            cmake.definitions['gRPC_ZLIB_PROVIDER'] = "package"
+            cmake.definitions['gRPC_SSL_PROVIDER'] = "package"
+            cmake.definitions['gRPC_PROTOBUF_PROVIDER'] = "package"
+            #cmake.definitions['gRPC_PROTOBUF_PROVIDER'] = "module"
 
-        #self.output.warn("protobuf binpath = {}".format(self.deps_cpp_info["protobuf"].binpath))
-        #cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.deps_cpp_info["protobuf"].binpath
-        #cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.deps_cpp_info["protobuf"].binpath
-        #cmake.definitions["CMAKE_PROGRAM_PATH"] += ";" + self.deps_cpp_info["protobuf"].binpath
+            # Compilation on minGW GCC requires to set _WIN32_WINNTT to at least 0x600
+            # https://github.com/grpc/grpc/blob/109c570727c3089fef655edcdd0dd02cc5958010/include/grpc/impl/codegen/port_platform.h#L44
+            if self.settings.os == "Windows" and self.settings.compiler == "gcc":
+                cmake.definitions["CMAKE_CXX_FLAGS"] = "-D_WIN32_WINNT=0x600"
+                cmake.definitions["CMAKE_C_FLAGS"] = "-D_WIN32_WINNT=0x600"
 
-        self.output.warn("build_dir = {}".format(self._build_dir))
-        cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self._build_dir
-        cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self._build_dir
+            #self.build_cmake_prefix_path(cmake,
+            #    self.deps_cpp_info["c-ares"].rootpath,
+            #    self.deps_cpp_info["protobuf"].rootpath
+            #    self._build_dir,
+            #    self._source_dir
+            #)
 
-        self.output.warn("source_dir = {}".format(self._source_dir))
-        cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self._source_dir
-        cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self._source_dir
+            #cmake.definitions["CMAKE_PROGRAM_PATH"] += ";" + "/home/avakimov_am/.conan/data/protobuf/v3.9.1/conan/stable/package/1a651c5b4129ad794b88522bece2281a7453aee4/bin"
 
-        self.output.warn("package_folder = {}".format(self.package_folder))
-        cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.package_folder
-        cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.package_folder
+            self.output.warn("c-ares rootpath = {}".format(self.deps_cpp_info["c-ares"].rootpath))
+            cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.deps_cpp_info["c-ares"].rootpath
+            cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.deps_cpp_info["c-ares"].rootpath
 
-        cmake.configure(source_folder=self._source_dir, build_folder=self._build_dir)
-        return cmake
+            self.output.warn("protobuf rootpath = {}".format(self.deps_cpp_info["protobuf"].rootpath))
+            cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.deps_cpp_info["protobuf"].rootpath
+            cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.deps_cpp_info["protobuf"].rootpath
+
+            #self.output.warn("protobuf binpath = {}".format(self.deps_cpp_info["protobuf"].binpath))
+            #cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.deps_cpp_info["protobuf"].binpath
+            #cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.deps_cpp_info["protobuf"].binpath
+            #cmake.definitions["CMAKE_PROGRAM_PATH"] += ";" + self.deps_cpp_info["protobuf"].binpath
+
+            self.output.warn("build_dir = {}".format(self._build_dir))
+            cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self._build_dir
+            cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self._build_dir
+
+            self.output.warn("source_dir = {}".format(self._source_dir))
+            cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self._source_dir
+            cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self._source_dir
+
+            self.output.warn("package_folder = {}".format(self.package_folder))
+            cmake.definitions["CMAKE_PREFIX_PATH"] += ";" + self.package_folder
+            cmake.definitions["CMAKE_MODULE_PATH"] += ";" + self.package_folder
+
+            cmake.configure(source_folder=self._source_dir, build_folder=self._build_dir)
+            return cmake
 
     def build(self):
         self.output.info('Building package \'{}\''.format(self.name))
@@ -340,6 +369,6 @@ message(STATUS "_gRPC_PROTOBUF_PROTOC_EXECUTABLE: ${{_gRPC_PROTOBUF_PROTOC_EXECU
             self.env_info.LD_LIBRARY_PATH.append(libpath)
 
     # see `conan install . -g deploy` in https://docs.conan.io/en/latest/devtools/running_packages.html
-    def deploy(self):
+    #def deploy(self):
         # self.copy("*", dst="/usr/local/bin", src="bin", keep_path=False)
-        self.copy("*", dst="bin", src="bin", keep_path=False)
+        #self.copy("*", dst="bin", src="bin", keep_path=False)
