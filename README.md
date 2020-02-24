@@ -5,11 +5,12 @@
 ## Docker build with `--no-cache`
 
 ```bash
+export MY_IP=$(ip route get 8.8.8.8 | sed -n '/src/{s/.*src *\([^ ]*\).*/\1/p;q}')
 sudo -E docker build \
     --build-arg PKG_NAME=grpc_conan/v1.26.x \
     --build-arg PKG_CHANNEL=conan/stable \
     --build-arg PKG_UPLOAD_NAME=grpc_conan/v1.26.x@conan/stable \
-    --build-arg CONAN_EXTRA_REPOS="conan-local http://10.108.8.182:8081/artifactory/api/conan/conan False" \
+    --build-arg CONAN_EXTRA_REPOS="conan-local http://$MY_IP:8081/artifactory/api/conan/conan False" \
     --build-arg CONAN_EXTRA_REPOS_USER="user -p password1 -r conan-local admin" \
     --build-arg CONAN_UPLOAD="conan upload --all -r=conan-local -c --retry 3 --retry-wait 10 --force" \
     --build-arg BUILD_TYPE=Debug \
@@ -19,7 +20,7 @@ sudo -E docker build \
     --build-arg PKG_NAME=grpc_conan/v1.26.x \
     --build-arg PKG_CHANNEL=conan/stable \
     --build-arg PKG_UPLOAD_NAME=grpc_conan/v1.26.x@conan/stable \
-    --build-arg CONAN_EXTRA_REPOS="conan-local http://10.108.8.182:8081/artifactory/api/conan/conan False" \
+    --build-arg CONAN_EXTRA_REPOS="conan-local http://$MY_IP:8081/artifactory/api/conan/conan False" \
     --build-arg CONAN_EXTRA_REPOS_USER="user -p password1 -r conan-local admin" \
     --build-arg CONAN_UPLOAD="conan upload --all -r=conan-local -c --retry 3 --retry-wait 10 --force" \
     --build-arg BUILD_TYPE=Debug \

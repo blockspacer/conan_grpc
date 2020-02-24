@@ -35,7 +35,7 @@ ARG CONAN_PACKAGE="conan package --build-folder=."
 ARG CONAN_EXPORT_PKG="conan export-pkg --profile gcc --build-folder=."
 
 # see https://docs.conan.io/en/latest/reference/commands/creator/test.html
-#ARG CONAN_TEST="conan test --profile gcc"
+ARG CONAN_TEST="conan test --profile gcc"
 
 # see https://docs.conan.io/en/latest/reference/commands/creator/create.html
 # NOTE: prefer `--keep-source` and `--keep-build` because `conan build` already performed
