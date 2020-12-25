@@ -44,6 +44,9 @@ export PKG_NAME=grpc_conan/v1.26.x@conan/stable
 conan remove $PKG_NAME
 conan create . conan/stable -s build_type=Debug --profile gcc --build missing
 CONAN_REVISIONS_ENABLED=1 CONAN_VERBOSE_TRACEBACK=1 CONAN_PRINT_RUN_COMMANDS=1 CONAN_LOGGING_LEVEL=10 conan upload $PKG_NAME --all -r=conan-local -c --retry 3 --retry-wait 10 --force
+
+# clean build cache
+conan remove "*" --build --force
 ```
 
 ## Conan package recipe for [*grpc*](https://github.com/grpc/grpc)
@@ -87,8 +90,12 @@ Note: It is recommended that you run conan install from a build directory and no
 
 The following command both runs all the steps of the conan file, and publishes the package to the local system cache.  This includes downloading dependencies from "build_requires" and "requires" , and then running the build() method.
 
-    $ conan create . gaeus/stable -s build_type=Debug --profile gcc --build=missing
+```bash
+conan create . gaeus/stable -s build_type=Debug --profile gcc --build=missing
 
+# clean build cache
+conan remove "*" --build --force
+```
 
 ### Available Options
 | Option        | Default | Possible Values  |
@@ -112,6 +119,9 @@ The following command both runs all the steps of the conan file, and publishes t
 ```bash
 # NOTE: about `--keep-source` see https://bincrafters.github.io/2018/02/27/Updated-Conan-Package-Flow-1.1/
 CONAN_PRINT_RUN_COMMANDS=1 CONAN_LOGGING_LEVEL=10 CONAN_VERBOSE_TRACEBACK=1 conan create . conan/stable -s build_type=Debug --profile gcc --build missing --keep-source
+
+# clean build cache
+conan remove "*" --build --force
 ```
 
 ## Conan Recipe License

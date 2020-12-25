@@ -328,6 +328,19 @@ message(STATUS "_gRPC_PROTOBUF_PROTOC_EXECUTABLE: ${{_gRPC_PROTOBUF_PROTOC_EXECU
         self.copy("*.dll", dst="bin", keep_path=False)
         self.copy("*.so", dst="lib", keep_path=False)
 
+        # Make sure we do not package .git
+        tools.rmdir(os.path.join(self.package_folder, '.git'))
+        tools.rmdir(os.path.join(self.build_folder, '.git'))
+        tools.rmdir(os.path.join(self.package_folder, self._source_dir, '.git'))
+        tools.rmdir(os.path.join(self.build_folder, self._source_dir, '.git'))
+
+        # We may need to run tests during build,
+        # but do not package tests ever
+        tools.rmdir(os.path.join(self.package_folder, 'tests'))
+        tools.rmdir(os.path.join(self.package_folder, 'lib', 'tests'))
+        tools.rmdir(os.path.join(self.build_folder, 'tests'))
+        tools.rmdir(os.path.join(self.build_folder, 'lib', 'tests'))
+
         #libupb.a
 
         #os.remove(os.path.join(self.package_folder, "lib", "sample.lib"))
