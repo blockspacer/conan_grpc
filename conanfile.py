@@ -381,6 +381,9 @@ message(STATUS "_gRPC_PROTOBUF_PROTOC_EXECUTABLE: ${{_gRPC_PROTOBUF_PROTOC_EXECU
         for libpath in self.deps_cpp_info.lib_paths:
             self.env_info.LD_LIBRARY_PATH.append(libpath)
 
+        grpc_cpp_plugin = "grpc_cpp_plugin.exe" if self.settings.os_build == "Windows" else "grpc_cpp_plugin"
+        self.env_info.grpc_cpp_plugin_BIN = os.path.normpath(os.path.join(self.package_folder, "bin", grpc_cpp_plugin))
+
     # see `conan install . -g deploy` in https://docs.conan.io/en/latest/devtools/running_packages.html
     #def deploy(self):
         # self.copy("*", dst="/usr/local/bin", src="bin", keep_path=False)
