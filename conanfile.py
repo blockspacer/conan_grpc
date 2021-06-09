@@ -2,9 +2,19 @@ from conans import ConanFile, CMake, tools, RunEnvironment
 from conans.errors import ConanInvalidConfiguration
 import os, re, platform
 
+# Users locally they get the 1.0.0 version,
+# without defining any env-var at all,
+# and CI servers will append the build number.
+# USAGE
+# version = get_version("1.0.0")
+# BUILD_NUMBER=-pre1+build2 conan export-pkg . my_channel/release
+def get_version(version):
+    bn = os.getenv("BUILD_NUMBER")
+    return (version + bn) if bn else version
+
 class grpcConan(ConanFile):
     name = "grpc_conan"
-    version = "v1.26.x"
+    version = get_version("v1.26.x")
     description = "Google's RPC library and framework."
     topics = ("conan", "grpc", "rpc")
     homepage = "https://github.com/grpc/grpc"

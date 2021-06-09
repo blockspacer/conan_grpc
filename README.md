@@ -41,9 +41,10 @@ docker run --cap-add=SYS_PTRACE --security-opt seccomp=unconfined --rm --entrypo
 
 ```bash
 export PKG_NAME=grpc_conan/v1.26.x@conan/stable
-conan remove $PKG_NAME
+(CONAN_REVISIONS_ENABLED=1 \
+    conan remove --force $PKG_NAME || true)
 conan create . conan/stable -s build_type=Debug --profile gcc --build missing
-CONAN_REVISIONS_ENABLED=1 CONAN_VERBOSE_TRACEBACK=1 CONAN_PRINT_RUN_COMMANDS=1 CONAN_LOGGING_LEVEL=10 conan upload $PKG_NAME --all -r=conan-local -c --retry 3 --retry-wait 10 --force
+conan upload $PKG_NAME --all -r=conan-local -c --retry 3 --retry-wait 10 --force
 
 # clean build cache
 conan remove "*" --build --force
