@@ -2,19 +2,9 @@ from conans import ConanFile, CMake, tools, RunEnvironment
 from conans.errors import ConanInvalidConfiguration
 import os, re, platform
 
-# Users locally they get the 1.0.0 version,
-# without defining any env-var at all,
-# and CI servers will append the build number.
-# USAGE
-# version = get_version("1.0.0")
-# BUILD_NUMBER=-pre1+build2 conan export-pkg . my_channel/release
-def get_version(version):
-    bn = os.getenv("BUILD_NUMBER")
-    return (version + bn) if bn else version
-
 class grpcConan(ConanFile):
     name = "grpc_conan"
-    version = get_version("v1.26.x")
+    version = "v1.26.x"
     description = "Google's RPC library and framework."
     topics = ("conan", "grpc", "rpc")
     homepage = "https://github.com/grpc/grpc"
@@ -62,14 +52,14 @@ class grpcConan(ConanFile):
 
     def requirements(self):
         if (self.options.withOpenSSL):
-            self.requires("openssl/OpenSSL_1_1_1-stable@conan/stable")
+            self.requires("openssl/1.1.1-stable@conan/stable")
         self.requires("zlib/v1.2.11@conan/stable")
         self.requires("c-ares/cares-1_15_0@conan/stable")
         self.requires("protobuf/v3.9.1@conan/stable")
 
     #def build_requirements(self):
         #if (self.options.withOpenSSL):
-        #    self.build_requires("openssl/OpenSSL_1_1_1-stable@conan/stable")
+        #    self.build_requires("openssl/1.1.1-stable@conan/stable")
         #self.build_requires("protobuf/v3.9.1@conan/stable")
 
     def build_cmake_prefix_path(self, cmake, *paths):
@@ -317,49 +307,51 @@ message(STATUS "_gRPC_PROTOBUF_PROTOC_EXECUTABLE: ${{_gRPC_PROTOBUF_PROTOC_EXECU
             return cmake
 
     def build(self):
-        self.output.info('Building package \'{}\''.format(self.name))
-        cmake = self._configure_cmake()
-        cmake.build()
+        with tools.vcvars(self.settings, only_diff=False): # https://github.com/conan-io/conan/issues/6577
+            self.output.info('Building package \'{}\''.format(self.name))
+            cmake = self._configure_cmake()
+            cmake.build()
 
     def package(self):
-        cmake = self._configure_cmake()
-        cmake.install()
+        with tools.vcvars(self.settings, only_diff=False): # https://github.com/conan-io/conan/issues/6577
+            cmake = self._configure_cmake()
+            cmake.install()
 
-        #cmake_files = ["gRPCConfig.cmake", "gRPCConfigVersion.cmake", "gRPCTargets.cmake"]
-        #for file in cmake_files:
-        #    self.copy(file, dst='.', src=cmake_folder)
+            #cmake_files = ["gRPCConfig.cmake", "gRPCConfigVersion.cmake", "gRPCTargets.cmake"]
+            #for file in cmake_files:
+            #    self.copy(file, dst='.', src=cmake_folder)
 
-        self.copy(pattern="LICENSE", dst="licenses")
-        self.copy('*', dst='include', src='{}/include'.format(self._source_dir))
-        self.copy('*.cmake', dst='lib', src='{}/lib'.format(self._build_dir), keep_path=True)
-        self.copy("*.lib", dst="lib", src="", keep_path=False)
-        self.copy("*.a", dst="lib", src="", keep_path=False)
-        self.copy("*", dst="bin", src="bin")
-        self.copy("*.dll", dst="bin", keep_path=False)
-        self.copy("*.so", dst="lib", keep_path=False)
+            self.copy(pattern="LICENSE", dst="licenses")
+            self.copy('*', dst='include', src='{}/include'.format(self._source_dir))
+            self.copy('*.cmake', dst='lib', src='{}/lib'.format(self._build_dir), keep_path=True)
+            self.copy("*.lib", dst="lib", src="", keep_path=False)
+            self.copy("*.a", dst="lib", src="", keep_path=False)
+            self.copy("*", dst="bin", src="bin")
+            self.copy("*.dll", dst="bin", keep_path=False)
+            self.copy("*.so", dst="lib", keep_path=False)
 
-        # Make sure we do not package .git
-        tools.rmdir(os.path.join(self.package_folder, '.git'))
-        tools.rmdir(os.path.join(self.build_folder, '.git'))
-        tools.rmdir(os.path.join(self.package_folder, self._source_dir, '.git'))
-        tools.rmdir(os.path.join(self.build_folder, self._source_dir, '.git'))
+            # Make sure we do not package .git
+            tools.rmdir(os.path.join(self.package_folder, '.git'))
+            tools.rmdir(os.path.join(self.build_folder, '.git'))
+            tools.rmdir(os.path.join(self.package_folder, self._source_dir, '.git'))
+            tools.rmdir(os.path.join(self.build_folder, self._source_dir, '.git'))
 
-        # We may need to run tests during build,
-        # but do not package tests ever
-        tools.rmdir(os.path.join(self.package_folder, 'tests'))
-        tools.rmdir(os.path.join(self.package_folder, 'lib', 'tests'))
-        tools.rmdir(os.path.join(self.build_folder, 'tests'))
-        tools.rmdir(os.path.join(self.build_folder, 'lib', 'tests'))
+            # We may need to run tests during build,
+            # but do not package tests ever
+            tools.rmdir(os.path.join(self.package_folder, 'tests'))
+            tools.rmdir(os.path.join(self.package_folder, 'lib', 'tests'))
+            tools.rmdir(os.path.join(self.build_folder, 'tests'))
+            tools.rmdir(os.path.join(self.build_folder, 'lib', 'tests'))
 
-        #libupb.a
+            #libupb.a
 
-        #os.remove(os.path.join(self.package_folder, "lib", "sample.lib"))
-        #os.remove(os.path.join(self.package_folder, "lib", "libsample.a"))
-        #os.remove(os.path.join(self.package_folder, "lib", "03-simple.a"))
-        #os.remove(os.path.join(self.package_folder, "lib", "04-simple.a"))
-        #os.remove(os.path.join(self.package_folder, "lib", "06-diff.a"))
+            #os.remove(os.path.join(self.package_folder, "lib", "sample.lib"))
+            #os.remove(os.path.join(self.package_folder, "lib", "libsample.a"))
+            #os.remove(os.path.join(self.package_folder, "lib", "03-simple.a"))
+            #os.remove(os.path.join(self.package_folder, "lib", "04-simple.a"))
+            #os.remove(os.path.join(self.package_folder, "lib", "06-diff.a"))
 
-        tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
+            tools.rmdir(os.path.join(self.package_folder, "lib", "pkgconfig"))
 
     def package_info(self):
         self.cpp_info.includedirs = ['{}/include'.format(self.package_folder)]
